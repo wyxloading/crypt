@@ -5,17 +5,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xordataexchange/crypt/backend"
-
 	"github.com/armon/consul-api"
+	"github.com/xordataexchange/crypt/backend"
 )
 
-type Client struct {
+func New(machines []string) (backend.Store, error) {
+	return NewHashicorpClient(machines)
+}
+
+type ArmonClient struct {
 	client    *consulapi.KV
 	waitIndex uint64
 }
 
-func New(machines []string) (*Client, error) {
+func NewArmonClient(machines []string) (*ArmonClient, error) {
 	conf := consulapi.DefaultConfig()
 	if len(machines) > 0 {
 		conf.Address = machines[0]
@@ -24,10 +27,10 @@ func New(machines []string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{client.KV(), 0}, nil
+	return &ArmonClient{client.KV(), 0}, nil
 }
 
-func (c *Client) Get(key string) ([]byte, error) {
+func (c *ArmonClient) Get(key string) ([]byte, error) {
 	kv, _, err := c.client.Get(key, nil)
 	if err != nil {
 		return nil, err
@@ -38,7 +41,7 @@ func (c *Client) Get(key string) ([]byte, error) {
 	return kv.Value, nil
 }
 
-func (c *Client) List(key string) (backend.KVPairs, error) {
+func (c *ArmonClient) List(key string) (backend.KVPairs, error) {
 	pairs, _, err := c.client.List(key, nil)
 	if err != nil {
 		return nil, err
@@ -53,7 +56,7 @@ func (c *Client) List(key string) (backend.KVPairs, error) {
 	return ret, nil
 }
 
-func (c *Client) Set(key string, value []byte) error {
+func (c *ArmonClient) Set(key string, value []byte) error {
 	key = strings.TrimPrefix(key, "/")
 	kv := &consulapi.KVPair{
 		Key:   key,
@@ -63,7 +66,7 @@ func (c *Client) Set(key string, value []byte) error {
 	return err
 }
 
-func (c *Client) Watch(key string, stop chan bool) <-chan *backend.Response {
+func (c *ArmonClient) Watch(key string, stop chan bool) <-chan *backend.Response {
 	respChan := make(chan *backend.Response, 0)
 	go func() {
 		for {
